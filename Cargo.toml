@@ -1,0 +1,18 @@
+[package]
+name = "uclid"
+version = "0.1.0"
+authors = ["Rein van der Woerd <reinvanderwoerd@me.com>"]
+
+[dependencies]
+time = "0.2.24"
+vst = "0.2.1"
+lerp = "0.3.0"
+libmath = "0.2.1"
+vst-gui = {git = "https://github.com/mikesoylu/rust-vst-gui"}
+rand = "0.8.2"
+rand_distr = "0.4.0"
+ws = ""
+webbrowser = ""
+
+[lib]
+crate-type = ["dylib"]

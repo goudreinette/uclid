@@ -1,0 +1,118 @@
+<!doctype html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.0.0/p5.min.js"></script>
+
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+
+
+<body>
+    <script>
+        let draggingSlider = false
+        let hoveringSlider = false
+        let sliderValue = 0 // normalized, 0-1 
+        let startY = 50
+        let endY
+
+        let bubbles = []
+
+
+        function setup() {
+            createCanvas(400, 600);
+            endY = height * .25
+        }
+
+
+        function draw() {
+            // Update dragging
+            if (mouseX > width / 2 - 40 && mouseX < width / 2 + 40) {
+                if (mouseIsPressed) {
+                    draggingSlider = true;
+                }
+                hoveringSlider = true
+            } else {
+                hoveringSlider = false
+            }
+
+            if (!mouseIsPressed) {
+                draggingSlider = false
+            }
+
+            if (draggingSlider) {
+                sliderValue = map(mouseY, startY, endY, 0, 1, true)
+                    external.invoke("setThreshold " + (1.01 - sliderValue));
+            }
+
+
+            // Drawing
+            background(220);
+            strokeWeight(2);
+
+            // butt
+            fill('pink')
+            ellipse(width / 2, height - 50, 500, 300)
+
+            // syringe
+            fill('white')
+            rect(width / 2 - 50, height * .25, 100, height / 2)
+            rect(width / 2 - 25, height * .75, 50, 20)
+
+            // syringe top/handle
+            fill(hoveringSlider ? '#eee' : 'white')
+            rect(width / 2 - 40, map(sliderValue, 0, 1, startY, endY) - 20, 80, 10)
+            rect(width / 2 - 30, map(sliderValue, 0, 1, startY, endY) - 10, 60, 10)
+
+            // stick inside
+            fill('white')
+            rect(width / 2 - 20, map(sliderValue, 0, 1, startY, endY), 40, 300)
+
+            // syringe contents
+            fill('aqua')
+            rect(width / 2 - 50, height * .5 + map(sliderValue, 0, 1, 0, 100), 100, height * .25 - map(sliderValue, 0, 1, 0, 100))
+
+            line(width / 2 - 50, height * .25, width / 2 + 50, height * .25)
+
+            // bubbles
+            if (bubbles.length < 30 && random() > 0.9) {
+                bubbles.push({
+                    x: random(width/2 - 48, width/2 + 48),
+                    y: height * .75,
+                    vy: random(-0.5, -2),
+                    vx: random(-0.1, 0.1),
+                    r: 5
+                })
+            }
+
+            fill('ragba(255,255,255,1)')
+            strokeWeight(0)
+            bubbles.forEach((bubble, i) => {
+                bubble.y += bubble.vy;
+
+                if (bubble.y < height * .5 + map(sliderValue, 0, 1, 0, 100) + 5) {
+                    bubbles.splice(i, 1)
+                }
+                ellipse(bubble.x, bubble.y, 5)
+            })
+
+            strokeWeight(2)
+            // stripes
+            for (let i = height * 0.25; i < height * 0.75; i += 20) {
+                line(width / 2 - 50, i, width / 2 - 40, i)
+            }
+
+
+            line(width / 2, height * .75 + 20, width / 2, height * .75 + 100)
+        }
+    </script>
+</body>
+
+</html>
