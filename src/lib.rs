@@ -208,7 +208,7 @@ impl Uclid {
 
         
 
-        if self.last_note != note {
+        if self.last_note != note { 
             self.last_note = note;
             let pattern_note = pattern[note as usize];
 
