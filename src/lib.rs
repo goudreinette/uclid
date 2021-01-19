@@ -11,13 +11,40 @@ extern crate smallvec;
 use vst::buffer::AudioBuffer;
 use vst::plugin::{Category, Info, Plugin, PluginParameters};
 use vst::util::AtomicFloat;
-use vst::api::{TimeInfo, TimeInfoFlags, Events};
+use vst::api::{Events};
 use vst::buffer::{ SendEventBuffer};
 use vst::event::{Event, MidiEvent};
 use vst::plugin::{CanDo, HostCallback,};
 use std::sync::Arc;
 use vst::host::{Host};
 use smallvec::SmallVec;
+
+
+
+/**
+ * Midi
+ */
+fn get_note_name(midi_pitch: i32) -> String {
+    let n = match midi_pitch % 12 {
+        0 => "C",
+        1 => "C#",
+        2 => "D",
+        3 => "D#",
+        4 => "E",
+        5 => "F",
+        6 => "F#",
+        7 => "G",
+        8 => "G#",
+        9 => "A",
+        10 => "A#",
+        11 => "B",
+        _ => ""
+    };
+
+    let o = midi_pitch / 12 + 1;
+    
+    format!("{}-{}", n, o)
+}
 
 
 /**
@@ -44,7 +71,7 @@ impl Default for UclidParameters {
             note: AtomicFloat::new(0.5),
             offset: AtomicFloat::new(0.),
             note_length: AtomicFloat::new(0.5),
-            multiplier: AtomicFloat::new(0.125)
+            multiplier: AtomicFloat::new(0.25)
         }
     }
 }
@@ -59,11 +86,11 @@ impl PluginParameters for UclidParameters {
         match index {
             0 => self.pulses.get(),
             1 => self.max_steps.get(),
-            2 => self.velocity.get(),
-            3 => self.note.get(),
-            4 => self.offset.get(),
-            5 => self.note_length.get(),
-            6 => self.multiplier.get(),
+            2 => self.multiplier.get(),
+            3 => self.offset.get(),
+            4 => self.note.get(),
+            5 => self.velocity.get(),
+            6 => self.note_length.get(),
             _ => 0.0,
         }
     }
@@ -74,11 +101,11 @@ impl PluginParameters for UclidParameters {
         match index {
             0 => self.pulses.set(val.max(0.03125)),
             1 => self.max_steps.set(val.max(0.03125)),
-            2 => self.velocity.set(val),
-            3 => self.note.set(val),
-            4 => self.offset.set(val),
-            5 => self.note_length.set(val),
-            6 => self.multiplier.set(val.max(0.125)),
+            2 => self.multiplier.set(val.max(0.125)),
+            3 => self.offset.set(val),
+            4 => self.note.set(val),
+            5 => self.velocity.set(val),
+            6 => self.note_length.set(val),
             _ => (),
         }
     }
@@ -89,25 +116,26 @@ impl PluginParameters for UclidParameters {
         match index {
             0 =>  format!("{:.0}", (self.pulses.get() * MAX_STEPS as f32).floor()),
             1 =>  format!("{:.0}", (self.max_steps.get() * MAX_STEPS as f32).floor()),
-            2 =>  format!("{:.0}", self.velocity.get() * 127.),
-            3 =>  format!("{:.0}", self.note.get() * 127.),
-            4 =>  format!("{:.0}", self.offset.get() * self.max_steps.get() * MAX_STEPS as f32),
-            5 =>  format!("{:.0}", self.note_length.get() * 3.),
-            6 =>  format!("{:.0}", (self.multiplier.get() * 4.).floor()),
+            2 =>  format!("{:.0}", (self.multiplier.get() * 4.).floor()),
+            3 =>  format!("{:.0}", self.offset.get() * self.max_steps.get() * MAX_STEPS as f32),
+            4 =>  get_note_name((self.note.get() * 127.) as i32),
+            5 =>  format!("{:.0}", self.velocity.get() * 127.),
+            6 =>  format!("{:.0}", self.note_length.get() * 3.),
             _ => "".to_string()
         }
     }
- 
+    
+    
     // This shows the control's name.
     fn get_parameter_name(&self, index: i32) -> String {
         match index {
             0 => "Pulses",
             1 => "Total steps",
-            2 => "Velocity",
-            3 => "Note",
-            4 => "Offset",
-            5 => "Note length",
-            6 => "Multiplier",
+            2 => "Multiplier",
+            3 => "Offset",
+            4 => "Note",
+            5 => "Velocity",
+            6 => "Note length",
             _ => "",
         }
         .to_string()
@@ -216,7 +244,6 @@ fn euclidian_rythm(steps: usize, pulses: usize) -> Result<SmallVec::<[u8; 64]>, 
 impl Uclid {
     fn do_rhythm(&mut self, pattern: &SmallVec<[u8;64]>) {
         // get params
-        let pulses = (self.params.pulses.get() * MAX_STEPS as f32).floor();
         let max_steps = (self.params.max_steps.get() * MAX_STEPS as f32).floor();
         let velocity = (self.params.velocity.get() * 127.) as u8; 
         let nooote = (self.params.note.get() * 127.) as u8; 
@@ -264,7 +291,7 @@ impl Uclid {
         }
 
 
-        for mut event in &mut self.noteoff_events {
+        for event in &mut self.noteoff_events {
             if event.time_left <= 0.0 {
                 self.send_buffer.send_events(vec![event.event], &mut self.host);
             }
