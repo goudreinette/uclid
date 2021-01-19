@@ -50,6 +50,12 @@ fn get_note_name(midi_pitch: i32) -> String {
 /**
  * Parameters
  */ 
+struct Preset {
+    name: String,
+    pulses: i32, 
+    max_steps: i32
+}
+
 struct UclidParameters {
     pulses: AtomicFloat,
     max_steps: AtomicFloat,
@@ -57,7 +63,10 @@ struct UclidParameters {
     note: AtomicFloat,
     offset: AtomicFloat,
     note_length: AtomicFloat,
-    multiplier: AtomicFloat
+    multiplier: AtomicFloat,
+
+    presets: Vec<Preset>,
+    current_preset: i32
 }
 
 
@@ -71,7 +80,22 @@ impl Default for UclidParameters {
             note: AtomicFloat::new(0.5),
             offset: AtomicFloat::new(0.),
             note_length: AtomicFloat::new(0.5),
-            multiplier: AtomicFloat::new(0.25)
+            multiplier: AtomicFloat::new(0.25),
+
+            presets: vec![
+                Preset {
+                    name: "5/7".to_string(),
+                    pulses: 5,
+                    max_steps: 7
+                },
+                Preset {
+                    name: "3/4".to_string(),
+                    pulses: 3,
+                    max_steps: 4
+                }
+            ],
+
+            current_preset: 0
         }
     }
 }
@@ -81,6 +105,29 @@ static MAX_STEPS: i32 = 32;
 
 
 impl PluginParameters for UclidParameters {
+    // PRESETS
+    fn change_preset(&self, preset: i32) {
+        let the_preset = &self.presets[preset as usize];
+        self.pulses.set(the_preset.pulses as f32 / MAX_STEPS as f32);
+        self.max_steps.set(the_preset.max_steps as f32 / MAX_STEPS as f32);
+    }
+
+    /// Get the current preset index.
+    fn get_preset_num(&self) -> i32 {
+        self.current_preset
+    }
+
+    /// Set the current preset name.
+    fn set_preset_name(&self, name: String) {
+        
+    }
+
+    /// Get the name of the preset at the index specified by `preset`.
+    fn get_preset_name(&self, preset: i32) -> String {
+        format!("{}", &self.presets[preset as usize].name)
+    }
+
+
     // the `get_parameter` function reads the value of a parameter.
     fn get_parameter(&self, index: i32) -> f32 {
         match index {
@@ -162,7 +209,6 @@ struct Uclid {
     send_buffer: SendEventBuffer,
     events: Vec<MidiEvent>,
     params: Arc<UclidParameters>,
-    bpm: f32,
     last_note: f64
 }
 
@@ -307,12 +353,12 @@ impl Uclid {
 }
 
 
+
 impl Plugin for Uclid {
     fn new(host: HostCallback) -> Self {
         let mut p = Uclid::default();
         p.host = host;
         p.params = Arc::new(UclidParameters::default());
-        p.bpm = 120.0;
         
         p
     }
@@ -326,6 +372,7 @@ impl Plugin for Uclid {
             inputs: 2,
             outputs: 2,
             parameters: 7,
+            presets: self.params.presets.len() as i32,
             category: Category::Effect,
             ..Default::default()
         }
