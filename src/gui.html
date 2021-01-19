@@ -16,9 +16,13 @@
 
 
 <body>
+    <div class="time"></div>
     <script>
-        let pulses = 4;
-        let max_steps = 5;
+        let pattern = [1,1,1,1];
+        let offset = 0
+        let time_note = 0
+
+        let $time = document.querySelector('.time')
 
         function setup() {
             createCanvas(400, 400);
@@ -30,19 +34,39 @@
 
             background('black')
             noFill()
-            stroke('white')
-
+            stroke(120)
+            strokeWeight(1)
             ellipse(width/2, height/2, radius)
 
+            let max_steps = pattern.length
+
             for (let i = 0; i < max_steps; i++) {
+                let v = pattern[(i + offset) % pattern.length]
+                let is_current = i == time_note
+
                 let x = width/2 + sin(TWO_PI / max_steps * i) * radius / 2;
                 let y = height/2 + cos(TWO_PI / max_steps * i) * radius / 2;
 
-                stroke(80)
+                stroke(is_current ? 'white' : 80)
+                strokeWeight(is_current ? 5 : 1)
+
                 line(width/2, height/2, x, y)
 
-                fill('white')
+                fill(v ? '#00ffbd' : 80)
                 ellipse(x, y, 20)
+            }
+
+            fill('white')
+            strokeWeight(0)
+            ellipse(width/2, height/2, 10)
+
+            if (external) {
+                let results = external.invoke("--").split('-')
+                pattern = JSON.parse(results[0])
+                offset = JSON.parse(results[1])
+                time_note = JSON.parse(results[2])
+
+                // $time.innerHTML = time_note
             }
         }
     </script>

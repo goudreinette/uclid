@@ -1,11 +1,9 @@
 #[macro_use]
 extern crate vst;
+extern crate vst_gui;
 extern crate time;
 extern crate rand;
 extern crate rand_distr;
-extern crate ws;
-extern crate webbrowser;
-extern crate vst_gui;
 extern crate smallvec;
 
 use vst::buffer::AudioBuffer;
@@ -15,9 +13,29 @@ use vst::api::{Events};
 use vst::buffer::{ SendEventBuffer};
 use vst::event::{Event, MidiEvent};
 use vst::plugin::{CanDo, HostCallback,};
-use std::sync::Arc;
+use std::sync::{Arc};
 use vst::host::{Host};
 use smallvec::SmallVec;
+use vst::editor::Editor;
+
+
+
+const HTML: &'static str = include_str!("./gui.html");
+
+
+fn create_javascript_callback(
+    params: Arc<UclidParameters>) -> vst_gui::JavascriptCallback
+{
+    Box::new(move |message: String| {
+        let max_steps = (params.max_steps.get() * MAX_STEPS as f32).floor() as usize;
+        let pulses = (params.pulses.get() * MAX_STEPS as f32).floor() as usize; // not more pulses than steps
+
+        let pattern = euclidian_rythm(max_steps, if pulses > max_steps { max_steps} else {pulses} ).unwrap();
+        
+        format!("{:?}-{:.0}-{:.0}", pattern, (params.offset.get() * max_steps as f32).floor(), params.time_note.get())
+    })
+}
+
 
 
 
@@ -66,7 +84,9 @@ struct UclidParameters {
     multiplier: AtomicFloat,
 
     presets: Vec<Preset>,
-    current_preset: i32
+    current_preset: i32,
+
+    time_note: AtomicFloat
 }
 
 
@@ -84,7 +104,7 @@ impl Default for UclidParameters {
 
             presets: vec![
                 Preset {
-                    name: "start".to_string(),
+                    name: "-- blank --".to_string(),
                     pulses: 4,
                     max_steps: 4
                 },
@@ -182,7 +202,9 @@ impl Default for UclidParameters {
                 },
             ],
 
-            current_preset: 0
+            current_preset: 0,
+
+            time_note: AtomicFloat::new(0.)
         }
     }
 }
@@ -194,9 +216,11 @@ static MAX_STEPS: i32 = 32;
 impl PluginParameters for UclidParameters {
     // PRESETS
     fn change_preset(&self, preset: i32) {
-        let the_preset = &self.presets[preset as usize];
-        self.pulses.set(the_preset.pulses as f32 / MAX_STEPS as f32);
-        self.max_steps.set(the_preset.max_steps as f32 / MAX_STEPS as f32);
+        if preset > 0 {
+            let the_preset = &self.presets[preset as usize];
+            self.pulses.set(the_preset.pulses as f32 / MAX_STEPS as f32);
+            self.max_steps.set(the_preset.max_steps as f32 / MAX_STEPS as f32);
+        }
     }
 
     /// Get the current preset index.
@@ -390,7 +414,8 @@ impl Uclid {
         
         
         let note = ((time_info.ppq_pos * multiplier).floor() + offset as f64) % max_steps as f64;
-        
+
+        self.params.time_note.set(note as f32);
 
         if self.last_note != note { 
             self.last_note = note;
@@ -516,6 +541,14 @@ impl Plugin for Uclid {
     
     fn get_parameter_object(&mut self) -> Arc<dyn PluginParameters> {
         Arc::clone(&self.params) as Arc<dyn PluginParameters>
+    }
+
+    fn get_editor(&mut self) -> Option<Box<dyn Editor>> {
+        let gui = vst_gui::new_plugin_gui(
+            String::from(HTML),
+            create_javascript_callback(self.params.clone()),
+            Some((400, 400)));
+        Some(Box::new(gui))
     }
 }
 
