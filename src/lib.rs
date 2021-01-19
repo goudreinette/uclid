@@ -28,6 +28,8 @@ struct UclidParameters {
     max_steps: AtomicFloat,
     velocity: AtomicFloat,
     note: AtomicFloat,
+    offset: AtomicFloat,
+    note_length: AtomicFloat
 }
 
 
@@ -35,16 +37,18 @@ impl Default for UclidParameters {
     fn default() -> UclidParameters {
         UclidParameters {
             // 4/4
-            pulses: AtomicFloat::new(0.25),
-            max_steps: AtomicFloat::new(0.25),
+            pulses: AtomicFloat::new(0.125),
+            max_steps: AtomicFloat::new(0.125),
             velocity: AtomicFloat::new(0.5),
             note: AtomicFloat::new(0.5),
+            offset: AtomicFloat::new(0.),
+            note_length: AtomicFloat::new(0.5)
         }
     }
 }
 
 
-static MAX_STEPS: i32 = 16;
+static MAX_STEPS: i32 = 32;
 
 
 impl PluginParameters for UclidParameters {
@@ -55,6 +59,8 @@ impl PluginParameters for UclidParameters {
             1 => self.max_steps.get(),
             2 => self.velocity.get(),
             3 => self.note.get(),
+            4 => self.offset.get(),
+            5 => self.note_length.get(),
             _ => 0.0,
         }
     }
@@ -63,10 +69,12 @@ impl PluginParameters for UclidParameters {
     fn set_parameter(&self, index: i32, val: f32) {        
         #[allow(clippy::single_match)]
         match index {
-            0 => self.pulses.set(val.max(0.0625)),
-            1 => self.max_steps.set(val.max(0.0625)),
+            0 => self.pulses.set(val.max(0.03125)),
+            1 => self.max_steps.set(val.max(0.03125)),
             2 => self.velocity.set(val),
             3 => self.note.set(val),
+            4 => self.offset.set(val),
+            5 => self.note_length.set(val),
             _ => (),
         }
     }
@@ -75,10 +83,12 @@ impl PluginParameters for UclidParameters {
     // format it into a string that makes the most since.
     fn get_parameter_text(&self, index: i32) -> String {
         match index {
-            0 =>  format!("{:.0}", self.pulses.get().min(self.max_steps.get()) * MAX_STEPS as f32),
-            1 =>  format!("{:.0}", self.max_steps.get() * MAX_STEPS as f32),
+            0 =>  format!("{:.0}", (self.pulses.get() * MAX_STEPS as f32).floor()),
+            1 =>  format!("{:.0}", (self.max_steps.get() * MAX_STEPS as f32).floor()),
             2 =>  format!("{:.0}", self.velocity.get() * 127.),
             3 =>  format!("{:.0}", self.note.get() * 127.),
+            4 =>  format!("{:.0}", self.offset.get() * self.max_steps.get() * MAX_STEPS as f32),
+            5 =>  format!("{:.0}", self.note_length.get() * 3.),
             _ => "".to_string()
         }
     }
@@ -90,6 +100,8 @@ impl PluginParameters for UclidParameters {
             1 => "Total steps",
             2 => "Velocity",
             3 => "Note",
+            4 => "Offset",
+            5 => "Note length",
             _ => "",
         }
         .to_string()
@@ -198,14 +210,25 @@ fn euclidian_rythm(steps: usize, pulses: usize) -> Result<SmallVec::<[u8; 64]>, 
 impl Uclid {
     fn do_rhythm(&mut self, pattern: &SmallVec<[u8;64]>) {
         // get params
+        let pulses = (self.params.pulses.get() * MAX_STEPS as f32).floor();
         let max_steps = (self.params.max_steps.get() * MAX_STEPS as f32).floor();
         let velocity = (self.params.velocity.get() * 127.) as u8; 
         let nooote = (self.params.note.get() * 127.) as u8; 
+        let note_length = self.params.note_length.get() * 3.; 
 
         let time_info = self.host.get_time_info(1 << 9).unwrap();
-
-        let note = (time_info.ppq_pos / 4.0 * max_steps as f64).floor() % max_steps as f64;
-
+        
+        let offset = self.params.offset.get() * max_steps;
+        
+        
+        let mut note: f64;
+        
+        if pulses <= max_steps {
+            note = ((time_info.ppq_pos).floor() + offset as f64) % max_steps as f64;
+        } else {
+            note = ((time_info.ppq_pos / 4.0 * pulses as f64).floor() + offset as f64) % max_steps as f64;
+        }
+ 
         
 
         if self.last_note != note { 
@@ -226,7 +249,7 @@ impl Uclid {
                 ], &mut self.host);
     
                 self.noteoff_events.push(DelayedMidiEvent {
-                    time_left: 0.05,
+                    time_left: note_length as f64,
                     event: MidiEvent {
                         data: [128, nooote, velocity],
                         delta_frames: 0,
@@ -275,7 +298,7 @@ impl Plugin for Uclid {
             version: 1,
             inputs: 2,
             outputs: 2,
-            parameters: 4,
+            parameters: 6,
             category: Category::Effect,
             ..Default::default()
         }
@@ -297,9 +320,9 @@ impl Plugin for Uclid {
 
     fn process(&mut self, buffer: &mut AudioBuffer<f32>) {
         let max_steps = (self.params.max_steps.get() * MAX_STEPS as f32).floor() as usize;
-        let pulses = ((self.params.pulses.get() * MAX_STEPS as f32).floor() as usize).min(max_steps); // not more pulses than steps
+        let pulses = (self.params.pulses.get() * MAX_STEPS as f32).floor() as usize; // not more pulses than steps
 
-        let pattern = euclidian_rythm(max_steps, pulses).unwrap();
+        let pattern = euclidian_rythm(max_steps, if pulses > max_steps { max_steps} else {pulses} ).unwrap();
 
         for (input, output) in buffer.zip() {
             for (in_sample, out_sample) in input.iter().zip(output) {
