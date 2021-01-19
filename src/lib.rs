@@ -29,7 +29,8 @@ struct UclidParameters {
     velocity: AtomicFloat,
     note: AtomicFloat,
     offset: AtomicFloat,
-    note_length: AtomicFloat
+    note_length: AtomicFloat,
+    multiplier: AtomicFloat
 }
 
 
@@ -42,7 +43,8 @@ impl Default for UclidParameters {
             velocity: AtomicFloat::new(0.5),
             note: AtomicFloat::new(0.5),
             offset: AtomicFloat::new(0.),
-            note_length: AtomicFloat::new(0.5)
+            note_length: AtomicFloat::new(0.5),
+            multiplier: AtomicFloat::new(0.125)
         }
     }
 }
@@ -61,6 +63,7 @@ impl PluginParameters for UclidParameters {
             3 => self.note.get(),
             4 => self.offset.get(),
             5 => self.note_length.get(),
+            6 => self.multiplier.get(),
             _ => 0.0,
         }
     }
@@ -75,6 +78,7 @@ impl PluginParameters for UclidParameters {
             3 => self.note.set(val),
             4 => self.offset.set(val),
             5 => self.note_length.set(val),
+            6 => self.multiplier.set(val.max(0.125)),
             _ => (),
         }
     }
@@ -89,6 +93,7 @@ impl PluginParameters for UclidParameters {
             3 =>  format!("{:.0}", self.note.get() * 127.),
             4 =>  format!("{:.0}", self.offset.get() * self.max_steps.get() * MAX_STEPS as f32),
             5 =>  format!("{:.0}", self.note_length.get() * 3.),
+            6 =>  format!("{:.0}", (self.multiplier.get() * 4.).floor()),
             _ => "".to_string()
         }
     }
@@ -102,6 +107,7 @@ impl PluginParameters for UclidParameters {
             3 => "Note",
             4 => "Offset",
             5 => "Note length",
+            6 => "Multiplier",
             _ => "",
         }
         .to_string()
@@ -215,20 +221,14 @@ impl Uclid {
         let velocity = (self.params.velocity.get() * 127.) as u8; 
         let nooote = (self.params.note.get() * 127.) as u8; 
         let note_length = self.params.note_length.get() * 3.; 
-
+        let multiplier = (self.params.multiplier.get() * 4.).floor() as f64; 
+        
         let time_info = self.host.get_time_info(1 << 9).unwrap();
         
         let offset = self.params.offset.get() * max_steps;
         
         
-        let mut note: f64;
-        
-        if pulses <= max_steps {
-            note = ((time_info.ppq_pos).floor() + offset as f64) % max_steps as f64;
-        } else {
-            note = ((time_info.ppq_pos / 4.0 * pulses as f64).floor() + offset as f64) % max_steps as f64;
-        }
- 
+        let note = ((time_info.ppq_pos * multiplier).floor() + offset as f64) % max_steps as f64;
         
 
         if self.last_note != note { 
@@ -298,7 +298,7 @@ impl Plugin for Uclid {
             version: 1,
             inputs: 2,
             outputs: 2,
-            parameters: 6,
+            parameters: 7,
             category: Category::Effect,
             ..Default::default()
         }
