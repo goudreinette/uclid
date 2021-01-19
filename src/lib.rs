@@ -84,15 +84,102 @@ impl Default for UclidParameters {
 
             presets: vec![
                 Preset {
-                    name: "5/7".to_string(),
+                    name: "start".to_string(),
+                    pulses: 4,
+                    max_steps: 4
+                },
+                Preset {
+                    name: "classical, jazz and Persian".to_string(),
+                    pulses: 2,
+                    max_steps: 5
+                },
+                Preset {
+                    name: "Bulgarian folk".to_string(),
                     pulses: 5,
                     max_steps: 7
                 },
                 Preset {
-                    name: "3/4".to_string(),
+                    name: "Turkey".to_string(),
+                    pulses: 4,
+                    max_steps: 9
+                },
+                Preset {
+                    name: "classical".to_string(),
+                    pulses: 5,
+                    max_steps: 11
+                },
+                Preset {
+                    name: "Brazillian necklace".to_string(),
+                    pulses: 5,
+                    max_steps: 16
+                },
+
+                // reverse ... bla
+                Preset {
+                    name: "West Africa, Latin America".to_string(),
+                    pulses: 2,
+                    max_steps: 3
+                },
+                Preset {
+                    name: "Trinidad, Persia".to_string(),
                     pulses: 3,
                     max_steps: 4
-                }
+                },
+                Preset {
+                    name: "Rumanian and Persian necklaces".to_string(),
+                    pulses: 3,
+                    max_steps: 5
+                },
+                Preset {
+                    name: "West Africa".to_string(),
+                    pulses: 3,
+                    max_steps: 8
+                },
+                Preset {
+                    name: "Bulgaria".to_string(),
+                    pulses: 4,
+                    max_steps: 7
+                },
+                Preset {
+                    name: "Frank Zappa".to_string(),
+                    pulses: 4,
+                    max_steps: 11
+                },
+                Preset {
+                    name: "Arab".to_string(),
+                    pulses: 5,
+                    max_steps: 6
+                },
+                Preset {
+                    name: "Arab".to_string(),
+                    pulses: 5,
+                    max_steps: 7
+                },
+                Preset {
+                    name: "Arab rhythm, South African and Rumanian necklaces".to_string(),
+                    pulses: 5,
+                    max_steps: 9
+                },
+                Preset {
+                    name: "South Africa".to_string(),
+                    pulses: 5,
+                    max_steps: 12
+                },
+                Preset {
+                    name: "Tuareg rhythm of Lybia".to_string(),
+                    pulses: 7,
+                    max_steps: 8
+                },
+                Preset {
+                    name: "Brazilian necklace".to_string(),
+                    pulses: 7,
+                    max_steps: 16
+                },
+                Preset {
+                    name: "Central Africa".to_string(),
+                    pulses: 11,
+                    max_steps: 24
+                },
             ],
 
             current_preset: 0
@@ -119,12 +206,13 @@ impl PluginParameters for UclidParameters {
 
     /// Set the current preset name.
     fn set_preset_name(&self, name: String) {
-        
+
     }
 
     /// Get the name of the preset at the index specified by `preset`.
     fn get_preset_name(&self, preset: i32) -> String {
-        format!("{}", &self.presets[preset as usize].name)
+        let p = &self.presets[preset as usize];
+        format!("{}/{}: {}", p.pulses, p.max_steps, p.name)
     }
 
 
@@ -298,7 +386,7 @@ impl Uclid {
         
         let time_info = self.host.get_time_info(1 << 9).unwrap();
         
-        let offset = self.params.offset.get() * max_steps;
+        let offset = (self.params.offset.get() * max_steps).floor();
         
         
         let note = ((time_info.ppq_pos * multiplier).floor() + offset as f64) % max_steps as f64;
